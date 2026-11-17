@@ -30,6 +30,7 @@ export class WebSerialTransport implements Transport {
   private reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
   private loop: Promise<void> = Promise.resolve();
   private closing = false;
+  private queue: Promise<void> = Promise.resolve();
   private port: SerialPortLike;
 
   // A plain field, not a parameter property: Node's type stripping (the unit tests) can't run those.
@@ -108,13 +109,20 @@ export class WebSerialTransport implements Transport {
     await this.port.close();
   }
 
-  async write(bytes: Uint8Array) {
-    const w = this.port.writable!.getWriter();
-    try {
-      await w.write(bytes);
-    } finally {
-      w.releaseLock();
-    }
+  /** Whole writes one after another: a write holds the stream's only writer until its bytes are out, and Link sends
+   *  two frames back to back (LINK-41.1). Unqueued, the second found the stream locked and was never sent. */
+  write(bytes: Uint8Array): Promise<void> {
+    const run = async () => {
+      const w = this.port.writable!.getWriter();
+      try {
+        await w.write(bytes);
+      } finally {
+        w.releaseLock();
+      }
+    };
+    const r = this.queue.then(run, run);
+    this.queue = r.catch(() => {}); // a failed write is the caller's to see; the next one still goes
+    return r;
   }
 
   /** Closes and reopens the port at `rate` (Web Serial can't change a port's rate in place). */

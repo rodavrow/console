@@ -664,7 +664,10 @@ export class Link {
         this.waiters.set(seq, { ty: P.msg.WRITE_MANY, seq, resolve });
         setTimeout(() => resolve(null), this.timeout() * 2);
       });
-      void this.t.write(this.session.request(P.msg.WRITE_MANY, f.body, performance.now()));
+      // Not awaited (the next frame goes while this one is out); a failed send shows as NO ANSWER, its cause logged.
+      this.t
+        .write(this.session.request(P.msg.WRITE_MANY, f.body, performance.now()))
+        .catch((e) => debugLog(`link WRITE_MANY #${seq} (windowed): send failed: ${(e as Error).message}`));
       debugLog(`link WRITE_MANY #${seq} (windowed) ops ${f.at}-${f.at + f.run - 1}, ${f.body.length} B`);
       return { f, got, seq };
     };
