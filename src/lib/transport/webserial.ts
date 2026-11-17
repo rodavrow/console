@@ -30,8 +30,12 @@ export class WebSerialTransport implements Transport {
   private reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
   private loop: Promise<void> = Promise.resolve();
   private closing = false;
+  private port: SerialPortLike;
 
-  private constructor(private port: SerialPortLike) {}
+  // A plain field, not a parameter property: Node's type stripping (the unit tests) can't run those.
+  private constructor(port: SerialPortLike) {
+    this.port = port;
+  }
 
   static async request(): Promise<WebSerialTransport> {
     const serial = webSerial();
