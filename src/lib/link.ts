@@ -671,7 +671,8 @@ export class Link {
     const flight: ReturnType<typeof send>[] = [];
     let k = 0;
     let stop: { at: number; lost?: boolean } | null = null;
-    while (k < frames.length || flight.length) {
+    // After a stop nothing more is sent: only what is in flight drains (frames left unsent go one at a time below).
+    while (flight.length || (!stop && k < frames.length)) {
       while (!stop && k < frames.length && flight.length < 2) flight.push(send(frames[k++]));
       const { f, got, seq } = flight.shift()!;
       const a = await got;
